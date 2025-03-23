@@ -35,7 +35,17 @@ def perguntar():
         return jsonify({"erro": "Pergunta não fornecida."}), 400
 
     # Busca FAISS
-    embedding = gerar_embedding(pergunta).reshape(1, -1)
+    # Traduz a pergunta para o inglês antes de gerar embedding
+traducao = client.chat.completions.create(
+    model="gpt-4-0125-preview",
+    messages=[
+        {"role": "system", "content": "Traduza para inglês médico sem explicações."},
+        {"role": "user", "content": pergunta}
+    ]
+).choices[0].message.content.strip()
+
+embedding = gerar_embedding(traducao).reshape(1, -1)
+
     _, indices = index.search(embedding, 3)
 
     contexto = ""
