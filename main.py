@@ -9,10 +9,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# 🔐 Substitua pela sua chave da OpenAI
-import os
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
 # 📥 Carrega os dados do livro
 with open("referencias.json", "r", encoding="utf-8") as f:
@@ -50,12 +47,12 @@ def perguntar():
         contexto += f"\n[{capitulo}]\n{trecho}\n"
         capitulos_usados.add(capitulo)
 
-    # Prompt para o GPT
-prompt = f"""
+    # ✅ Prompt corretamente indentado
+    prompt = f"""
 Você é um assistente médico especializado em Cirurgia Geral e altamente científico.  
 Responda à pergunta abaixo usando somente as informações contidas no contexto fornecido.  
 Não use conhecimento próprio e não adicione dados externos, mesmo que saiba a resposta.
-Apresente a resposta da maneira mais completa possível
+Apresente a resposta da maneira mais completa possível.
 Organize a resposta em HTML, com títulos, listas e parágrafos, para facilitar a leitura.
 Caso a informação não esteja no contexto, responda exatamente:  
 <b>Essa informação não está disponível no material fornecido.</b>
@@ -67,8 +64,7 @@ Caso a informação não esteja no contexto, responda exatamente:
 
 <h3>Pergunta:</h3>
 <p>{pergunta}</p>
-"""
-
+    """
 
     resposta = client.chat.completions.create(
         model="gpt-4-0125-preview",
