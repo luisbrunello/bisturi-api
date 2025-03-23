@@ -11,20 +11,25 @@ CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# 📚 Carrega os dados de todos os livros
-def carregar_livro(nome_json, nome_faiss, livro_id):
-    with open(nome_json, "r", encoding="utf-8") as f:
-        referencias = json.load(f)
-    index = faiss.read_index(nome_faiss)
-    return {"referencias": referencias, "index": index, "id": livro_id}
+# Carrega as referências e índices dos 3 livros
+livros = [
+    {
+        "nome": "Sabiston Textbook of Surgery 21st Ed",
+        "referencias": json.load(open("referencias.json", "r", encoding="utf-8")),
+        "index": faiss.read_index("indice_capitulos.faiss")
+    },
+    {
+        "nome": "Surgical Anatomy and Technique – Skandalakis 5th Ed",
+        "referencias": json.load(open("referencias_anatomia.json", "r", encoding="utf-8")),
+        "index": faiss.read_index("indice_anatomia.faiss")
+    },
+    {
+        "nome": "Mattox Trauma 9th Ed",
+        "referencias": json.load(open("referencias_mattox.json", "r", encoding="utf-8")),
+        "index": faiss.read_index("indice_mattox.faiss")
+    }
+]
 
-sabiston = carregar_livro("referencias.json", "indice_capitulos.faiss", "Sabiston")
-anatomia = carregar_livro("referencias_anatomia.json", "indice_anatomia.faiss", "Anatomia")
-mattox = carregar_livro("referencias_mattox.json", "indice_mattox.faiss", "Mattox")
-
-bases = [sabiston, anatomia, mattox]
-
-# 🧠 Gera embedding
 def gerar_embedding(texto):
     response = client.embeddings.create(
         input=texto,
@@ -40,7 +45,7 @@ def perguntar():
     if not pergunta:
         return jsonify({"erro": "Pergunta não fornecida."}), 400
 
-    # 🌐 Traduz a pergunta para inglês médico
+    # Traduz a pergunta para inglês médico antes do embedding
     traducao = client.chat.completions.create(
         model="gpt-4-0125-preview",
         messages=[
@@ -52,29 +57,26 @@ def perguntar():
     embedding = gerar_embedding(traducao).reshape(1, -1)
 
     contexto = ""
-    fontes_usadas = []
+    referencias_usadas = []
 
-    # 🔍 Consulta os 3 índices
-    for base in bases:
-        _, indices = base["index"].search(embedding, 3)
-
+    for livro in livros:
+        _, indices = livro["index"].search(embedding, 3)
         for i in indices[0]:
-            trecho = base["referencias"][i]["texto"]
-            capitulo = base["referencias"][i]["capitulo"]
-            contexto += f"\n[{base['id']} – {capitulo}]\n{trecho}\n"
-            fontes_usadas.append(f"{base['id']} – {capitulo}")
+            ref = livro["referencias"][i]
+            capitulo = ref.get("capitulo", "Capítulo desconhecido")
+            trecho = ref.get("texto", "")
+            contexto += f"\n[{livro['nome']} – {capitulo}]\n{trecho}\n"
+            referencias_usadas.append(f"{livro['nome']} – {capitulo}")
 
-    # 📝 Prompt com orientação científica e detalhada
+    # Prompt final
     prompt = f"""
-Você é um assistente médico especializado em Cirurgia Geral, altamente científico e baseado em evidências.  
-Responda à pergunta abaixo **usando exclusivamente** as informações fornecidas no contexto.
+Você é um assistente médico especializado em Cirurgia Geral e altamente científico.  
+Responda à pergunta abaixo usando somente as informações contidas no contexto fornecido.  
+Não use conhecimento próprio e não adicione dados externos, mesmo que saiba a resposta.
+Caso diferentes livros tragam informações divergentes, explique as diferenças com base no material e cite as fontes diretamente abaixo de cada ponto.
+Organize a resposta em HTML, com títulos, listas e parágrafos para facilitar a leitura.
 
-Se houver informações **conflitantes entre os livros**, destaque e compare as diferenças claramente,
-**citado a fonte específica abaixo de cada trecho**.
-
-Organize sua resposta em **HTML bem formatado**, com títulos, listas, parágrafos e negrito para facilitar a leitura.
-
-Se a resposta não estiver no contexto, responda exatamente:  
+Caso a informação não esteja no contexto, responda exatamente:  
 <b>Essa informação não está disponível no material fornecido.</b>
 
 ---
@@ -95,15 +97,13 @@ Se a resposta não estiver no contexto, responda exatamente:
 
     resposta_texto = resposta.choices[0].message.content.strip()
 
-    # 📚 Monta citação das fontes
-    fontes_unicas = sorted(set(fontes_usadas))
-    citacao = "Referências utilizadas: " + "; ".join(fontes_unicas)
+    referencias_formatadas = sorted(set(referencias_usadas))
+    citacoes_html = "<br>".join(referencias_formatadas)
 
     return jsonify({
         "resposta": resposta_texto,
-        "referencia": citacao
+        "referencia": f"<b>Referências:</b><br>{citacoes_html}"
     })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
