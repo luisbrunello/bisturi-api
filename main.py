@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import numpy as np
 import faiss
 import json
@@ -6,6 +7,7 @@ from openai import OpenAI
 import os
 
 app = Flask(__name__)
+CORS(app)
 
 # 🔐 Substitua pela sua chave da OpenAI
 import os
