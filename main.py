@@ -11,13 +11,13 @@ CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# 📥 Carrega os dados do livro
+# Carrega os dados do livro
 with open("referencias.json", "r", encoding="utf-8") as f:
     referencias = json.load(f)
 
 index = faiss.read_index("indice_capitulos.faiss")
 
-# 🔍 Função para gerar embedding
+# Gera embedding
 def gerar_embedding(texto):
     response = client.embeddings.create(
         input=texto,
@@ -25,7 +25,6 @@ def gerar_embedding(texto):
     )
     return np.array(response.data[0].embedding)
 
-# 🚀 Rota principal da API
 @app.route("/perguntar", methods=["POST"])
 def perguntar():
     dados = request.get_json()
@@ -34,18 +33,16 @@ def perguntar():
     if not pergunta:
         return jsonify({"erro": "Pergunta não fornecida."}), 400
 
-    # Busca FAISS
-    # Traduz a pergunta para o inglês antes de gerar embedding
-traducao = client.chat.completions.create(
-    model="gpt-4-0125-preview",
-    messages=[
-        {"role": "system", "content": "Traduza para inglês médico sem explicações."},
-        {"role": "user", "content": pergunta}
-    ]
-).choices[0].message.content.strip()
+    # Traduz a pergunta para inglês médico antes do embedding
+    traducao = client.chat.completions.create(
+        model="gpt-4-0125-preview",
+        messages=[
+            {"role": "system", "content": "Traduza para inglês médico sem explicações."},
+            {"role": "user", "content": pergunta}
+        ]
+    ).choices[0].message.content.strip()
 
-embedding = gerar_embedding(traducao).reshape(1, -1)
-
+    embedding = gerar_embedding(traducao).reshape(1, -1)
     _, indices = index.search(embedding, 3)
 
     contexto = ""
@@ -57,7 +54,7 @@ embedding = gerar_embedding(traducao).reshape(1, -1)
         contexto += f"\n[{capitulo}]\n{trecho}\n"
         capitulos_usados.add(capitulo)
 
-    # ✅ Prompt corretamente indentado
+    # Prompt final
     prompt = f"""
 Você é um assistente médico especializado em Cirurgia Geral e altamente científico.  
 Responda à pergunta abaixo usando somente as informações contidas no contexto fornecido.  
@@ -74,7 +71,7 @@ Caso a informação não esteja no contexto, responda exatamente:
 
 <h3>Pergunta:</h3>
 <p>{pergunta}</p>
-    """
+"""
 
     resposta = client.chat.completions.create(
         model="gpt-4-0125-preview",
