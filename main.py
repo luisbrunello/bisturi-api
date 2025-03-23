@@ -111,7 +111,7 @@ Se houver divergências entre os livros, explique de forma objetiva e cite os li
     contagem = Counter(capitulos_usados)
     capitulos_relevantes = contagem.most_common(4)  # Pega no máximo 4 mais citados
 
-    referencias_formatadas = "**Referências (em ordem de relevância):** <br>" + "<br>".join(
+    referencias_formatadas = "**Referências (em ordem de relevância):**\n" + "\n".join(
         f"{livro} – {capitulo}" for livro, capitulo in capitulos_relevantes
     )
 
