@@ -84,7 +84,7 @@ Apresente a resposta da maneira mais completa possível.
 Organize a resposta em HTML, com títulos, listas e parágrafos para facilitar a leitura.
 
 Caso a informação não esteja no contexto, responda exatamente:
-<b>Essa informação não está disponível no material fornecido.</b>
+<b>Informação não disponível. Dica: tente alterar as palavras, ou reformular a pergunta!</b>
 
 Se houver divergências entre os livros, explique de forma objetiva e cite os livros logo abaixo de cada ponto de diferença.
 
