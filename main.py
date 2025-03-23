@@ -11,13 +11,20 @@ CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Carrega os dados do livro
-with open("referencias.json", "r", encoding="utf-8") as f:
-    referencias = json.load(f)
+# 📚 Carrega os dados de todos os livros
+def carregar_livro(nome_json, nome_faiss, livro_id):
+    with open(nome_json, "r", encoding="utf-8") as f:
+        referencias = json.load(f)
+    index = faiss.read_index(nome_faiss)
+    return {"referencias": referencias, "index": index, "id": livro_id}
 
-index = faiss.read_index("indice_capitulos.faiss")
+sabiston = carregar_livro("referencias.json", "indice_capitulos.faiss", "Sabiston")
+anatomia = carregar_livro("referencias_anatomia.json", "indice_anatomia.faiss", "Anatomia")
+mattox = carregar_livro("referencias_mattox.json", "indice_mattox.faiss", "Mattox")
 
-# Gera embedding
+bases = [sabiston, anatomia, mattox]
+
+# 🧠 Gera embedding
 def gerar_embedding(texto):
     response = client.embeddings.create(
         input=texto,
@@ -33,7 +40,7 @@ def perguntar():
     if not pergunta:
         return jsonify({"erro": "Pergunta não fornecida."}), 400
 
-    # Traduz a pergunta para inglês médico antes do embedding
+    # 🌐 Traduz a pergunta para inglês médico
     traducao = client.chat.completions.create(
         model="gpt-4-0125-preview",
         messages=[
@@ -43,25 +50,31 @@ def perguntar():
     ).choices[0].message.content.strip()
 
     embedding = gerar_embedding(traducao).reshape(1, -1)
-    _, indices = index.search(embedding, 3)
 
     contexto = ""
-    capitulos_usados = set()
+    fontes_usadas = []
 
-    for i in indices[0]:
-        trecho = referencias[i]["texto"]
-        capitulo = referencias[i]["capitulo"]
-        contexto += f"\n[{capitulo}]\n{trecho}\n"
-        capitulos_usados.add(capitulo)
+    # 🔍 Consulta os 3 índices
+    for base in bases:
+        _, indices = base["index"].search(embedding, 3)
 
-    # Prompt final
+        for i in indices[0]:
+            trecho = base["referencias"][i]["texto"]
+            capitulo = base["referencias"][i]["capitulo"]
+            contexto += f"\n[{base['id']} – {capitulo}]\n{trecho}\n"
+            fontes_usadas.append(f"{base['id']} – {capitulo}")
+
+    # 📝 Prompt com orientação científica e detalhada
     prompt = f"""
-Você é um assistente médico especializado em Cirurgia Geral e altamente científico.  
-Responda à pergunta abaixo usando somente as informações contidas no contexto fornecido.  
-Não use conhecimento próprio e não adicione dados externos, mesmo que saiba a resposta.
-Apresente a resposta da maneira mais completa possível.
-Organize a resposta em HTML, com títulos, listas e parágrafos, para facilitar a leitura.
-Caso a informação não esteja no contexto, responda exatamente:  
+Você é um assistente médico especializado em Cirurgia Geral, altamente científico e baseado em evidências.  
+Responda à pergunta abaixo **usando exclusivamente** as informações fornecidas no contexto.
+
+Se houver informações **conflitantes entre os livros**, destaque e compare as diferenças claramente,
+**citado a fonte específica abaixo de cada trecho**.
+
+Organize sua resposta em **HTML bem formatado**, com títulos, listas, parágrafos e negrito para facilitar a leitura.
+
+Se a resposta não estiver no contexto, responda exatamente:  
 <b>Essa informação não está disponível no material fornecido.</b>
 
 ---
@@ -81,7 +94,10 @@ Caso a informação não esteja no contexto, responda exatamente:
     )
 
     resposta_texto = resposta.choices[0].message.content.strip()
-    citacao = "Referências: Sabiston Textbook of Surgery 21st Edition – " + ", ".join(sorted(capitulos_usados))
+
+    # 📚 Monta citação das fontes
+    fontes_unicas = sorted(set(fontes_usadas))
+    citacao = "Referências utilizadas: " + "; ".join(fontes_unicas)
 
     return jsonify({
         "resposta": resposta_texto,
@@ -90,3 +106,4 @@ Caso a informação não esteja no contexto, responda exatamente:
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+
