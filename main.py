@@ -11,25 +11,32 @@ CORS(app)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Carrega as referências e índices dos 3 livros
+# Carrega os dados dos três livros
 livros = [
     {
-        "nome": "Sabiston Textbook of Surgery 21st Ed",
-        "referencias": json.load(open("referencias.json", "r", encoding="utf-8")),
-        "index": faiss.read_index("indice_capitulos.faiss")
+        "nome_arquivo": "referencias.json",
+        "nome_faiss": "indice_capitulos.faiss",
+        "referencia": "Sabiston Textbook of Surgery 21st Ed",
     },
     {
-        "nome": "Surgical Anatomy and Technique – Skandalakis 5th Ed",
-        "referencias": json.load(open("referencias_anatomia.json", "r", encoding="utf-8")),
-        "index": faiss.read_index("indice_anatomia.faiss")
+        "nome_arquivo": "referencias_anatomia.json",
+        "nome_faiss": "indice_anatomia.faiss",
+        "referencia": "Surgical Anatomy and Technique – Skandalakis 5th Ed",
     },
     {
-        "nome": "Mattox Trauma 9th Ed",
-        "referencias": json.load(open("referencias_mattox.json", "r", encoding="utf-8")),
-        "index": faiss.read_index("indice_mattox.faiss")
+        "nome_arquivo": "referencias_mattox.json",
+        "nome_faiss": "indice_mattox.faiss",
+        "referencia": "Mattox Trauma 9th Ed",
     }
 ]
 
+# Carrega dados e índices
+for livro in livros:
+    with open(livro["nome_arquivo"], "r", encoding="utf-8") as f:
+        livro["referencias"] = json.load(f)
+    livro["index"] = faiss.read_index(livro["nome_faiss"])
+
+# Função para gerar embedding
 def gerar_embedding(texto):
     response = client.embeddings.create(
         input=texto,
@@ -45,7 +52,7 @@ def perguntar():
     if not pergunta:
         return jsonify({"erro": "Pergunta não fornecida."}), 400
 
-    # Traduz a pergunta para inglês médico antes do embedding
+    # Traduz a pergunta para inglês médico
     traducao = client.chat.completions.create(
         model="gpt-4-0125-preview",
         messages=[
@@ -57,27 +64,29 @@ def perguntar():
     embedding = gerar_embedding(traducao).reshape(1, -1)
 
     contexto = ""
-    referencias_usadas = []
+    capitulos_usados = []
 
     for livro in livros:
         _, indices = livro["index"].search(embedding, 3)
         for i in indices[0]:
-            ref = livro["referencias"][i]
-            capitulo = ref.get("capitulo", "Capítulo desconhecido")
-            trecho = ref.get("texto", "")
-            contexto += f"\n[{livro['nome']} – {capitulo}]\n{trecho}\n"
-            referencias_usadas.append(f"{livro['nome']} – {capitulo}")
+            trecho = livro["referencias"][i]["texto"]
+            capitulo = livro["referencias"][i]["capitulo"]
+            contexto += f"\n[{livro['referencia']} – {capitulo}]\n{trecho}\n"
+            capitulos_usados.append((livro["referencia"], capitulo))
 
     # Prompt final
     prompt = f"""
-Você é um assistente médico especializado em Cirurgia Geral e altamente científico.  
-Responda à pergunta abaixo usando somente as informações contidas no contexto fornecido.  
+Você é um assistente médico especializado em Cirurgia Geral e altamente científico.
+Responda à pergunta abaixo usando exclusivamente as informações contidas no contexto fornecido.
 Não use conhecimento próprio e não adicione dados externos, mesmo que saiba a resposta.
-Caso diferentes livros tragam informações divergentes, explique as diferenças com base no material e cite as fontes diretamente abaixo de cada ponto.
+
+Apresente a resposta da maneira mais completa possível.
 Organize a resposta em HTML, com títulos, listas e parágrafos para facilitar a leitura.
 
-Caso a informação não esteja no contexto, responda exatamente:  
+Caso a informação não esteja no contexto, responda exatamente:
 <b>Essa informação não está disponível no material fornecido.</b>
+
+Se houver divergências entre os livros, explique de forma objetiva e cite os livros logo abaixo de cada ponto de diferença.
 
 ---
 
@@ -97,12 +106,18 @@ Caso a informação não esteja no contexto, responda exatamente:
 
     resposta_texto = resposta.choices[0].message.content.strip()
 
-    referencias_formatadas = sorted(set(referencias_usadas))
-    citacoes_html = "<br>".join(referencias_formatadas)
+    # Contagem dos capítulos mais usados (evita listar todos)
+    from collections import Counter
+    contagem = Counter(capitulos_usados)
+    capitulos_relevantes = contagem.most_common(4)  # Pega no máximo 4 mais citados
+
+    referencias_formatadas = "Referências:<br>" + "<br>".join(
+        f"{livro} – {capitulo}" for livro, capitulo in capitulos_relevantes
+    )
 
     return jsonify({
         "resposta": resposta_texto,
-        "referencia": f"<b>Referências:</b><br>{citacoes_html}"
+        "referencia": referencias_formatadas
     })
 
 if __name__ == "__main__":
