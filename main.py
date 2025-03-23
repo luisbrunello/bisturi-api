@@ -51,15 +51,27 @@ def perguntar():
         capitulos_usados.add(capitulo)
 
     # Prompt para o GPT
-    prompt = f"""
-Responda com base apenas no contexto abaixo.
-Se não encontrar a resposta, diga "Essa informação não está disponível no material fornecido."
+prompt = f"""
+Você é um assistente médico especializado em Cirurgia Geral.  
+Responda à pergunta abaixo usando **somente** as informações contidas no contexto fornecido.  
 
-Contexto:
-{contexto}
+⚠️ **Não use conhecimento próprio** e **não adicione dados externos**, mesmo que saiba a resposta.
+Apresente a resposta da maneira mais completa possível
 
-Pergunta: {pergunta}
+✅ Organize a resposta em **HTML**, com títulos, listas e parágrafos, para facilitar a leitura.
+
+📌 Caso a informação não esteja no contexto, responda exatamente:  
+<b>Essa informação não está disponível no material fornecido.</b>
+
+---
+
+<h3>Contexto:</h3>
+<pre>{contexto}</pre>
+
+<h3>Pergunta:</h3>
+<p>{pergunta}</p>
 """
+
 
     resposta = client.chat.completions.create(
         model="gpt-4-0125-preview",
