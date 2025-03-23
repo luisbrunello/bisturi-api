@@ -2,3 +2,4 @@ flask
 faiss-cpu
 openai
 gunicorn
+flask-cors
