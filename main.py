@@ -67,7 +67,7 @@ def perguntar():
     capitulos_usados = []
 
     for livro in livros:
-        _, indices = livro["index"].search(embedding, 6)
+        _, indices = livro["index"].search(embedding, 3)
         for i in indices[0]:
             trecho = livro["referencias"][i]["texto"]
             capitulo = livro["referencias"][i]["capitulo"]
