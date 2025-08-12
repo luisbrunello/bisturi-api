@@ -100,7 +100,7 @@ Se houver divergências entre os livros, explique de forma objetiva e cite os li
 """
 
     resposta = client.chat.completions.create(
-        model="gpt-4-0125-preview",
+        model="gpt-5-mini",
         messages=[
             {"role": "system", "content": prompt}
         ]
