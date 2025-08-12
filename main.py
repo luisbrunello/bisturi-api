@@ -54,7 +54,7 @@ def perguntar():
 
     # Traduz a pergunta para inglês médico
     traducao = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-5-nano",
         messages=[
             {"role": "system", "content": "Traduza para inglês médico sem explicações."},
             {"role": "user", "content": pergunta}
@@ -100,7 +100,7 @@ Se houver divergências entre os livros, explique de forma objetiva e cite os li
 """
 
     resposta = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-5-nano",
         messages=[
             {"role": "system", "content": prompt}
         ]
